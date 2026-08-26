@@ -30,6 +30,31 @@ function patternIndex(x, y, z, face, cell, length) {
   return (value >>> 0) % length;
 }
 
+function variedCellColor(baseColor, variation, block, faceIndex, cell, totalCells) {
+  const color = new THREE.Color(baseColor);
+  if (!variation) return color;
+
+  const hsl = { h: 0, s: 0, l: 0 };
+  color.getHSL(hsl);
+  const ramp = totalCells > 1 ? cell / (totalCells - 1) : 0.5;
+  const hueNoise = patternIndex(block.x, block.y, block.z, faceIndex + 29, cell + 193, 4096) / 4095;
+  const saturationNoise = patternIndex(block.x, block.y, block.z, faceIndex + 43, cell + 389, 4096) / 4095;
+  const lightnessNoise = patternIndex(block.x, block.y, block.z, faceIndex + 71, cell + 769, 4096) / 4095;
+  const hueOffset = ((hueNoise * 0.72 + ramp * 0.28) - 0.5) * (variation.hue ?? 0);
+  const saturation = THREE.MathUtils.clamp(
+    hsl.s + (saturationNoise - 0.5) * (variation.saturation ?? 0),
+    0,
+    1,
+  );
+  const lightness = THREE.MathUtils.clamp(
+    hsl.l + (lightnessNoise - 0.5) * (variation.lightness ?? 0),
+    0.08,
+    1,
+  );
+  color.setHSL((hsl.h + hueOffset + 1) % 1, saturation, lightness);
+  return color;
+}
+
 export class VoxelWorld {
   constructor(atlas, parent, materials, { faceResolution = 8 } = {}) {
     this.atlas = atlas;
@@ -122,9 +147,17 @@ export class VoxelWorld {
             const glyph = glyphs[
               patternIndex(block.x, block.y, block.z, faceIndex, cell, glyphs.length)
             ];
-            const color = colors[
+            const baseColor = colors[
               patternIndex(block.x, block.y, block.z, faceIndex + 11, cell + 97, colors.length)
             ];
+            const color = variedCellColor(
+              baseColor,
+              style.variation ?? material.variation,
+              block,
+              faceIndex,
+              cell,
+              resolution * resolution,
+            );
             const horizontal = (column - (resolution - 1) / 2) * cellSize;
             const vertical = ((resolution - 1) / 2 - row) * cellSize;
             const position = faceCenter

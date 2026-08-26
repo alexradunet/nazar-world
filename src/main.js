@@ -34,6 +34,7 @@ const BLOCK_MATERIALS = [
     label: 'GRASS',
     color: COLORS.grass,
     colors: [COLORS.grass, COLORS.lime, COLORS.mint],
+    variation: { hue: 0.08, saturation: 0.12, lightness: 0.18 },
     glyphs: ["'", '"', '.', ':', '%', '*', OCTANT_GLYPHS[2]],
     sample: ({ normal, row, resolution }) => {
       if (normal.y > 0) return { glyphs: ["'", '"', '.', '*'], colors: [COLORS.grass, COLORS.lime, COLORS.mint] };
@@ -46,6 +47,7 @@ const BLOCK_MATERIALS = [
     label: 'STONE',
     color: COLORS.slate,
     colors: [COLORS.slate, COLORS.white, COLORS.violet],
+    variation: { hue: 0.06, saturation: 0.14, lightness: 0.2 },
     glyphs: ['#', '%', '.', QUADRANT_GLYPHS[4]],
   },
   {
@@ -53,6 +55,7 @@ const BLOCK_MATERIALS = [
     label: 'WOOD',
     color: COLORS.amber,
     colors: [COLORS.amber, COLORS.earth, COLORS.yellow],
+    variation: { hue: 0.08, saturation: 0.1, lightness: 0.16 },
     glyphs: ['|', '!', 'H', '=', 'O', '0', '@'],
     sample: ({ normal }) => normal.y === 0
       ? { glyphs: ['|', '!', 'H'], colors: [COLORS.amber, COLORS.earth, COLORS.yellow] }
@@ -63,6 +66,7 @@ const BLOCK_MATERIALS = [
     label: 'LEAVES',
     color: COLORS.lime,
     colors: [COLORS.grass, COLORS.lime, COLORS.mint, COLORS.yellow],
+    variation: { hue: 0.16, saturation: 0.12, lightness: 0.2 },
     glyphs: ['&', '*', '+', SEXTANT_GLYPHS[5], BRAILLE_GLYPHS[4]],
   },
   {
@@ -70,6 +74,7 @@ const BLOCK_MATERIALS = [
     label: 'GLASS',
     color: COLORS.cyan,
     colors: [COLORS.cyan, COLORS.blue, COLORS.violet, COLORS.white],
+    variation: { hue: 0.28, saturation: 0.1, lightness: 0.2 },
     glyphs: ['/', '\\', '|', '.', BRAILLE_GLYPHS[1]],
   },
   {
@@ -77,6 +82,7 @@ const BLOCK_MATERIALS = [
     label: 'GLOW',
     color: COLORS.magenta,
     colors: [COLORS.magenta, COLORS.yellow, COLORS.cyan, COLORS.white],
+    variation: { hue: 0.55, saturation: 0.08, lightness: 0.14 },
     glyphs: ['0', '1', '*', '+', BRAILLE_GLYPHS[4]],
   },
 ];
