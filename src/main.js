@@ -1,6 +1,14 @@
 import * as THREE from 'three';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
-import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+import {
+  BRAILLE_GLYPHS,
+  GlyphAtlas,
+  GlyphField,
+  OCTANT_GLYPHS,
+  QUADRANT_GLYPHS,
+  SEXTANT_GLYPHS,
+  addGlyphSprite,
+} from './glyph-engine.js';
 import './style.css';
 
 const COLORS = {
@@ -42,126 +50,10 @@ renderer.xr.enabled = true;
 app.append(renderer.domElement);
 document.body.append(VRButton.createButton(renderer));
 
-const textureCache = new Map();
-const allGlyphMeshes = [];
+const glyphAtlas = new GlyphAtlas(renderer);
+const glyphFields = [];
 let glyphCount = 0;
 let paletteOffset = 0;
-
-// Unicode sextants use a 2×3 cell and octants a 2×4 cell. We draw the
-// same mosaics ourselves so newer octants work even when a headset font
-// does not yet cover Symbols for Legacy Computing Supplement.
-function mosaicGlyph(kind, mask) {
-  return `${kind}:${mask.toString(16)}`;
-}
-
-const SEXTANT_GLYPHS = [
-  0b010101,
-  0b101010,
-  0b100101,
-  0b011010,
-  0b110011,
-  0b101101,
-  0b011110,
-  0b111001,
-].map((mask) => mosaicGlyph('sextant', mask));
-
-const OCTANT_GLYPHS = [
-  0b01010101,
-  0b10101010,
-  0b10011001,
-  0b01100110,
-  0b11110000,
-  0b00111100,
-  0b11011011,
-  0b11100111,
-].map((mask) => mosaicGlyph('octant', mask));
-
-function drawMosaic(context, rows, mask) {
-  const left = 18;
-  const top = 10;
-  const cellWidth = 46;
-  const cellHeight = 108 / rows;
-
-  for (let cell = 0; cell < rows * 2; cell += 1) {
-    if ((mask & (1 << cell)) === 0) continue;
-    const column = cell % 2;
-    const row = Math.floor(cell / 2);
-    context.fillRect(left + column * cellWidth, top + row * cellHeight, cellWidth + 0.5, cellHeight + 0.5);
-  }
-}
-
-function glyphTexture(glyph) {
-  if (textureCache.has(glyph)) return textureCache.get(glyph);
-
-  const canvas = document.createElement('canvas');
-  canvas.width = 128;
-  canvas.height = 128;
-  const context = canvas.getContext('2d');
-  context.clearRect(0, 0, 128, 128);
-  context.fillStyle = '#ffffff';
-
-  const mosaic = /^(sextant|octant):([0-9a-f]+)$/.exec(glyph);
-  if (mosaic) {
-    drawMosaic(context, mosaic[1] === 'sextant' ? 3 : 4, Number.parseInt(mosaic[2], 16));
-  } else {
-    context.font = '700 92px "Courier New", monospace';
-    context.textAlign = 'center';
-    context.textBaseline = 'middle';
-    context.fillText(glyph, 64, 68);
-  }
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-  textureCache.set(glyph, texture);
-  return texture;
-}
-
-class GlyphField {
-  constructor(parent = scene) {
-    this.parent = parent;
-    this.batches = new Map();
-  }
-
-  add(glyph, color, position, quaternion, scale = 1) {
-    const key = `${glyph}:${color}`;
-    if (!this.batches.has(key)) {
-      this.batches.set(key, { glyph, color, matrices: [] });
-    }
-
-    const size = typeof scale === 'number' ? new THREE.Vector3(scale, scale, scale) : scale;
-    const matrix = new THREE.Matrix4();
-    matrix.compose(position, quaternion, size);
-    this.batches.get(key).matrices.push(matrix);
-    glyphCount += 1;
-  }
-
-  flush() {
-    const meshes = [];
-
-    for (const { glyph, color, matrices } of this.batches.values()) {
-      const geometry = new THREE.PlaneGeometry(1, 1);
-      const material = new THREE.MeshBasicMaterial({
-        color,
-        map: glyphTexture(glyph),
-        alphaTest: 0.16,
-        side: THREE.DoubleSide,
-        toneMapped: false,
-      });
-      const mesh = new THREE.InstancedMesh(geometry, material, matrices.length);
-      matrices.forEach((matrix, index) => mesh.setMatrixAt(index, matrix));
-      mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
-      mesh.frustumCulled = false;
-      mesh.userData.baseColor = new THREE.Color(color);
-      mesh.userData.glyph = glyph;
-      this.parent.add(mesh);
-      allGlyphMeshes.push(mesh);
-      meshes.push(mesh);
-    }
-
-    return meshes;
-  }
-}
 
 const identity = new THREE.Quaternion();
 const floorRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
@@ -178,7 +70,8 @@ function choose(value, options) {
   return options[Math.floor(value * options.length) % options.length];
 }
 
-const world = new GlyphField();
+const world = new GlyphField(glyphAtlas, scene);
+glyphFields.push(world);
 
 // A floor made from individually placed, GPU-instanced glyph planes.
 for (let x = WORLD.minX; x <= WORLD.maxX; x += 1) {
@@ -255,7 +148,7 @@ function addRuinWall(x1, z1, x2, z2, height, glyph, color) {
 
 addRuinWall(-11, -2, -4, -2, 2.7, '/', COLORS.cyan);
 addRuinWall(4, -2, 11, -2, 2.7, '\\', COLORS.violet);
-addRuinWall(-4, 6, 4, 6, 1.95, '=', COLORS.magenta);
+addRuinWall(-4, 6, 4, 6, 1.95, QUADRANT_GLYPHS[3], COLORS.magenta);
 
 function addText(text, centerX, y, z, color, size = 0.5) {
   const spacing = size * 0.92;
@@ -274,18 +167,17 @@ for (let index = 0; index < 180; index += 1) {
   const x = THREE.MathUtils.lerp(WORLD.minX + 1, WORLD.maxX - 1, hash2(index, 2));
   const z = THREE.MathUtils.lerp(WORLD.minZ + 1, WORLD.maxZ - 1, hash2(index, 7));
   const y = THREE.MathUtils.lerp(5.4, 8.5, hash2(index, 13));
-  const glyph = index % 7 === 0 ? '+' : '*';
+  const glyph = index % 7 === 0 ? '+' : choose(hash2(index, 19), BRAILLE_GLYPHS);
   const color = index % 11 === 0 ? COLORS.magenta : COLORS.cyan;
   world.add(glyph, color, new THREE.Vector3(x, y, z), ceilingRotation, index % 7 === 0 ? 0.42 : 0.25);
 }
-
-world.flush();
 
 // The portal is its own local glyph field so its entire ASCII ring can animate.
 const portal = new THREE.Group();
 portal.position.set(0, 2.25, WORLD.minZ + 0.08);
 scene.add(portal);
-const portalField = new GlyphField(portal);
+const portalField = new GlyphField(glyphAtlas, portal);
+glyphFields.push(portalField);
 const portalGlyphs = 32;
 for (let index = 0; index < portalGlyphs; index += 1) {
   const angle = (index / portalGlyphs) * Math.PI * 2;
@@ -293,20 +185,78 @@ for (let index = 0; index < portalGlyphs; index += 1) {
   const position = new THREE.Vector3(Math.cos(angle) * 1.6, Math.sin(angle) * 1.6, 0.04);
   portalField.add(index % 2 ? '0' : '1', index % 2 ? COLORS.magenta : COLORS.cyan, position, rotation, 0.5);
 }
-portalField.flush();
 
-status.textContent = `${glyphCount.toLocaleString()} glyphs // sextants + octants online`;
+// Glyph entities are authored as tiny text sprites. Their presentation is
+// entirely character-based while position, collection, and behavior remain data.
+const sigils = [];
+const sigilPositions = [
+  [-9, -13],
+  [8, -11],
+  [-10, 0],
+  [10, 7],
+  [0, -5],
+];
+const sigilSymbols = ['*', '$', '?', '!', '@'];
+const sigilColors = [COLORS.cyan, COLORS.magenta, COLORS.violet, COLORS.mint, COLORS.white];
+
+sigilPositions.forEach(([x, z], index) => {
+  const group = new THREE.Group();
+  group.position.set(x, 1.4, z);
+  scene.add(group);
+
+  const field = new GlyphField(glyphAtlas, group);
+  addGlyphSprite(field, [' /\\ ', `<${sigilSymbols[index]}>`, ' \\/ '], sigilColors[index], 0.34);
+  field.add('*', COLORS.white, new THREE.Vector3(0, 0, 0.16), identity, 0.2);
+  glyphFields.push(field);
+  sigils.push({ group, field, baseY: group.position.y, phase: index * 1.37, active: true });
+});
+
+// VR input is represented by characters too: a bracket-shaped controller and
+// a dotted glyph ray replace conventional controller meshes.
+const controllers = [];
+for (let index = 0; index < 2; index += 1) {
+  const controller = renderer.xr.getController(index);
+  controller.visible = false;
+  controller.addEventListener('connected', () => { controller.visible = true; });
+  controller.addEventListener('disconnected', () => { controller.visible = false; });
+  controller.addEventListener('selectstart', shiftPalette);
+  player.add(controller);
+
+  const field = new GlyphField(glyphAtlas, controller);
+  addGlyphSprite(field, index === 0 ? ['[+'] : ['+]'], COLORS.mint, 0.1);
+  for (let ray = 1; ray <= 12; ray += 1) {
+    field.add(
+      ray === 12 ? '>' : '.',
+      ray === 12 ? COLORS.magenta : COLORS.mint,
+      new THREE.Vector3(0, 0, -ray * 0.18),
+      identity,
+      ray === 12 ? 0.1 : 0.055,
+    );
+  }
+  glyphFields.push(field);
+  controllers.push(controller);
+}
+
+// Every field shares one atlas. A field can mix any registered character and
+// color in a single instanced draw call.
+glyphAtlas.build();
+glyphFields.forEach((field) => field.flush());
+glyphCount = glyphFields.reduce((total, field) => total + field.count, 0);
+
+let collectedSigils = 0;
+let worldDecoded = false;
+
+function updateStatus(message = '') {
+  const objective = `${collectedSigils}/${sigils.length} sigils`;
+  status.textContent = `${objective} // ${glyphCount.toLocaleString()} glyphs${message ? ` // ${message}` : ''}`;
+}
+
+updateStatus('find the glyphs');
 
 function shiftPalette() {
   paletteOffset = (paletteOffset + 0.11) % 1;
-  const hsl = { h: 0, s: 0, l: 0 };
-
-  allGlyphMeshes.forEach((mesh) => {
-    mesh.userData.baseColor.getHSL(hsl);
-    mesh.material.color.setHSL((hsl.h + paletteOffset) % 1, hsl.s, hsl.l);
-  });
-
-  status.textContent = `${glyphCount.toLocaleString()} glyphs online // spectrum ${Math.round(paletteOffset * 360)}°`;
+  glyphFields.forEach((field) => field.setPaletteOffset(paletteOffset));
+  updateStatus(`spectrum ${Math.round(paletteOffset * 360)}°`);
 }
 
 // Desktop controls.
@@ -336,23 +286,6 @@ document.addEventListener('mousemove', (event) => {
   pitch = THREE.MathUtils.clamp(pitch - event.movementY * 0.0022, -1.35, 1.35);
   camera.rotation.x = pitch;
 });
-
-// VR controllers, visible rays, trigger interaction, and thumbstick locomotion.
-const controllerModelFactory = new XRControllerModelFactory();
-for (let index = 0; index < 2; index += 1) {
-  const controller = renderer.xr.getController(index);
-  const rayGeometry = new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(0, 0, 0),
-    new THREE.Vector3(0, 0, -2.5),
-  ]);
-  controller.add(new THREE.Line(rayGeometry, new THREE.LineBasicMaterial({ color: COLORS.mint })));
-  controller.addEventListener('selectstart', shiftPalette);
-  player.add(controller);
-
-  const grip = renderer.xr.getControllerGrip(index);
-  grip.add(controllerModelFactory.createControllerModel(grip));
-  player.add(grip);
-}
 
 renderer.xr.addEventListener('sessionstart', () => {
   if (document.pointerLockElement) document.exitPointerLock();
@@ -425,6 +358,39 @@ function updateXRMovement(delta) {
   applyBounds();
 }
 
+const cameraWorldPosition = new THREE.Vector3();
+const sigilFacingTarget = new THREE.Vector3();
+
+function updateSigils(elapsed) {
+  camera.getWorldPosition(cameraWorldPosition);
+
+  sigils.forEach((sigil) => {
+    if (!sigil.active) return;
+
+    sigil.group.position.y = sigil.baseY + Math.sin(elapsed * 1.8 + sigil.phase) * 0.16;
+    sigilFacingTarget.set(cameraWorldPosition.x, sigil.group.position.y, cameraWorldPosition.z);
+    sigil.group.lookAt(sigilFacingTarget);
+
+    const dx = player.position.x - sigil.group.position.x;
+    const dz = player.position.z - sigil.group.position.z;
+    if (dx * dx + dz * dz < 1.35 * 1.35) {
+      sigil.active = false;
+      sigil.group.visible = false;
+      collectedSigils += 1;
+      updateStatus(collectedSigils === sigils.length ? 'portal unlocked' : 'sigil acquired');
+    }
+  });
+
+  if (collectedSigils === sigils.length && !worldDecoded) {
+    const portalDx = player.position.x - portal.position.x;
+    const portalDz = player.position.z - portal.position.z;
+    if (portalDx * portalDx + portalDz * portalDz < 2.1 * 2.1) {
+      worldDecoded = true;
+      updateStatus('WORLD DECODED');
+    }
+  }
+}
+
 function animate() {
   const delta = Math.min(clock.getDelta(), 0.05);
   const elapsed = clock.elapsedTime;
@@ -432,8 +398,10 @@ function animate() {
   if (renderer.xr.isPresenting) updateXRMovement(delta);
   else updateDesktopMovement(delta);
 
-  portal.rotation.z += delta * 0.12;
-  const pulse = 1 + Math.sin(elapsed * 2.1) * 0.035;
+  updateSigils(elapsed);
+  portal.rotation.z += delta * (collectedSigils === sigils.length ? 0.55 : 0.12);
+  const pulseAmount = collectedSigils === sigils.length ? 0.11 : 0.035;
+  const pulse = 1 + Math.sin(elapsed * 2.1) * pulseAmount;
   portal.scale.setScalar(pulse);
 
   renderer.render(scene, camera);

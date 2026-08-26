@@ -1,6 +1,6 @@
 # ASCII // VR
 
-A Three.js/WebXR experiment that builds a navigable 3D room from GPU-instanced ASCII glyphs.
+A Three.js/WebXR game experiment where the world, objects, collectibles, portal, and VR controllers are composed from GPU-instanced glyphs.
 
 **Live demo:** https://alexradunet.github.io/nazar-world/
 
@@ -11,7 +11,7 @@ npm install
 npm run dev
 ```
 
-Open the URL printed by Vite. On desktop, click the scene and use **WASD + mouse**. Press **Space** to shift the color spectrum.
+Open the URL printed by Vite. On desktop, click the scene and use **WASD + mouse**. Press **Space** to shift the color spectrum. Find all five floating glyph sigils to unlock the portal.
 
 ## VR
 
@@ -21,15 +21,18 @@ WebXR requires a secure context. `localhost` is accepted for local development; 
 
 ## Structure
 
-- `src/main.js` — scene, glyph batching, generated world, desktop and XR controls
+- `src/glyph-engine.js` — shared atlas, mosaic generation, mixed-glyph instancing, and text-sprite composition
+- `src/main.js` — generated world, glyph entities, game loop, and desktop/XR controls
 - `src/style.css` — HUD and presentation
 - `index.html` — application shell
 
-The world renders glyphs as `THREE.InstancedMesh` batches grouped by character and color, avoiding one object/draw call per glyph.
+Each `GlyphField` can mix characters and per-instance colors in one `THREE.InstancedMesh`. A shader adjustment selects each character from a shared atlas, so adding a larger glyph vocabulary does not create one draw call per character.
 
-## Sextant and octant mosaics
+See [`docs/GLYPH_ENGINE.md`](docs/GLYPH_ENGINE.md) for the character vocabulary, data model, rendering pipeline, and implementation roadmap.
 
-Terrain uses 2×4 octant mosaics while boundary walls use 2×3 sextants. These are drawn procedurally into the glyph atlas rather than relying on installed Unicode fonts, because many current headset fonts do not yet include the octant range. The resulting textures retain the same block-cell geometry and remain GPU-instanced.
+## Procedural mosaic vocabulary
+
+Terrain uses 2×4 octants, boundary walls use 2×3 sextants, ruins can use 2×2 quadrants, and sparse particles use 2×4 Braille dots. These are drawn procedurally into the glyph atlas rather than relying on installed Unicode fonts, because many current headset fonts do not yet include the newer ranges. The resulting textures retain the same cell geometry and remain GPU-instanced.
 
 ## Deployment
 
