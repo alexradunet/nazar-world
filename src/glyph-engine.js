@@ -209,12 +209,27 @@ export class GlyphField {
     return this.instances.length;
   }
 
-  add(glyph, color, position, quaternion, scale = 1) {
+  add(glyph, color, position, quaternion, scale = 1, data = null) {
     const size = typeof scale === 'number' ? new THREE.Vector3(scale, scale, scale) : scale;
     const matrix = new THREE.Matrix4();
     matrix.compose(position, quaternion, size);
     this.atlas.register(glyph);
-    this.instances.push({ glyph, color: new THREE.Color(color), matrix });
+    this.instances.push({ glyph, color: new THREE.Color(color), matrix, data });
+  }
+
+  clear() {
+    if (this.mesh) {
+      this.parent.remove(this.mesh);
+      this.mesh.geometry.dispose();
+      this.mesh.material.dispose();
+    }
+    this.instances.length = 0;
+    this.baseColors.length = 0;
+    this.mesh = null;
+  }
+
+  dataForInstance(instanceId) {
+    return this.instances[instanceId]?.data ?? null;
   }
 
   flush() {

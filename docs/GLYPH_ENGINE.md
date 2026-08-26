@@ -69,10 +69,10 @@ Sextant, octant, quadrant, and Braille patterns can be selected from local densi
 
 ## Gameplay systems to add next
 
-1. **Instance picking:** map raycast instance IDs back to glyph cells.
-2. **Editable fields:** change, remove, or add glyphs without rebuilding the world.
+1. **Incremental chunk rebuilds:** update only the edited voxel chunk instead of rebuilding the whole voxel field.
+2. **Editable fields:** change atlas indices and transforms in place without recreating an instanced mesh.
 3. **Text-map compiler:** author rooms and entities as character grids.
-4. **Collision compiler:** generate simple hidden colliders from solid glyph cells.
+4. **Expanded collision:** add vertical movement, stepping, gravity, and grounded block traversal.
 5. **Glyph animation:** swap atlas indices for character-based animation frames.
 6. **LOD grammar:** octants nearby, sextants at medium range, ASCII punctuation far away.
 7. **Glyph editor:** VR placement, recoloring, rotation, and deletion of cells.
@@ -87,6 +87,8 @@ The prototype already uses:
 - quadrant ruin surfaces;
 - procedural Braille star and particle fields;
 - ASCII architecture and portal pieces;
+- editable glyph voxels with 2×2 character-textured exposed faces;
+- voxel-DDA block targeting, mining, placement, and simple collision;
 - text-authored collectible sigils;
 - glyph-composed VR controllers and rays;
 - one shared atlas with mixed-glyph instancing;

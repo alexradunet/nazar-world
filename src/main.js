@@ -9,6 +9,7 @@ import {
   SEXTANT_GLYPHS,
   addGlyphSprite,
 } from './glyph-engine.js';
+import { VoxelWorld } from './voxel-world.js';
 import './style.css';
 
 const COLORS = {
@@ -19,6 +20,15 @@ const COLORS = {
   dim: 0x45bd86,
   white: 0xffffff,
 };
+
+const BLOCK_MATERIALS = [
+  { id: 'stone', label: 'STONE', color: COLORS.white, glyphs: ['#', '%', QUADRANT_GLYPHS[4]] },
+  { id: 'soil', label: 'SOIL', color: COLORS.dim, glyphs: ['.', ':', OCTANT_GLYPHS[2]] },
+  { id: 'metal', label: 'METAL', color: COLORS.cyan, glyphs: ['H', '=', '+'] },
+  { id: 'glass', label: 'GLASS', color: COLORS.violet, glyphs: ['/', '\\', '|'] },
+  { id: 'organic', label: 'ORGANIC', color: COLORS.mint, glyphs: ['&', '@', '*'] },
+  { id: 'signal', label: 'SIGNAL', color: COLORS.magenta, glyphs: ['0', '1', BRAILLE_GLYPHS[4]] },
+];
 
 const WORLD = {
   minX: -14,
@@ -190,6 +200,19 @@ for (let index = 0; index < 180; index += 1) {
   world.add(glyph, color, new THREE.Vector3(x, y, z), ceilingRotation, index % 7 === 0 ? 0.42 : 0.25);
 }
 
+// Minecraft-like blocks are stored as voxels, but every exposed face is
+// compiled into a 2×2 character texture through the same glyph renderer.
+const voxelWorld = new VoxelWorld(glyphAtlas, scene, BLOCK_MATERIALS);
+voxelWorld.generateDemo();
+glyphFields.push(voxelWorld.field);
+
+const blockTarget = new THREE.Group();
+blockTarget.visible = false;
+scene.add(blockTarget);
+const blockTargetField = new GlyphField(glyphAtlas, blockTarget);
+blockTargetField.add('X', COLORS.magenta, new THREE.Vector3(), identity, 0.28);
+glyphFields.push(blockTargetField);
+
 // The portal is its own local glyph field so its entire ASCII ring can animate.
 const portal = new THREE.Group();
 portal.position.set(0, 2.25, WORLD.minZ + 0.08);
@@ -235,9 +258,16 @@ const controllers = [];
 for (let index = 0; index < 2; index += 1) {
   const controller = renderer.xr.getController(index);
   controller.visible = false;
-  controller.addEventListener('connected', () => { controller.visible = true; });
+  controller.addEventListener('connected', (event) => {
+    controller.visible = true;
+    controller.userData.handedness = event.data.handedness;
+  });
   controller.addEventListener('disconnected', () => { controller.visible = false; });
-  controller.addEventListener('selectstart', shiftPalette);
+  controller.addEventListener('selectstart', () => {
+    const place = controller.userData.handedness === 'left'
+      || (!controller.userData.handedness && index === 0);
+    editVoxelFromObject(controller, place);
+  });
   player.add(controller);
 
   const field = new GlyphField(glyphAtlas, controller);
@@ -258,23 +288,98 @@ for (let index = 0; index < 2; index += 1) {
 // Every field shares one atlas. A field can mix any registered character and
 // color in a single instanced draw call.
 glyphAtlas.build();
-glyphFields.forEach((field) => field.flush());
-glyphCount = glyphFields.reduce((total, field) => total + field.count, 0);
+glyphFields.forEach((field) => {
+  if (field !== voxelWorld.field) field.flush();
+});
+voxelWorld.rebuild();
 
 let collectedSigils = 0;
 let worldDecoded = false;
+let selectedBlockIndex = 0;
+
+function refreshGlyphCount() {
+  glyphCount = glyphFields.reduce((total, field) => total + field.count, 0);
+}
 
 function updateStatus(message = '') {
   const objective = `${collectedSigils}/${sigils.length} sigils`;
-  status.textContent = `${objective} // ${glyphCount.toLocaleString()} glyphs${message ? ` // ${message}` : ''}`;
+  const material = BLOCK_MATERIALS[selectedBlockIndex].label;
+  status.textContent = `${objective} // ${voxelWorld.blockCount} blocks // ${glyphCount.toLocaleString()} glyphs // ${material}${message ? ` // ${message}` : ''}`;
 }
 
-updateStatus('find the glyphs');
+refreshGlyphCount();
+updateStatus('mine or build');
 
 function shiftPalette() {
   paletteOffset = (paletteOffset + 0.11) % 1;
   glyphFields.forEach((field) => field.setPaletteOffset(paletteOffset));
   updateStatus(`spectrum ${Math.round(paletteOffset * 360)}°`);
+}
+
+const voxelRaycaster = new THREE.Raycaster();
+voxelRaycaster.far = 9;
+const voxelRayOrigin = new THREE.Vector3();
+const voxelRayDirection = new THREE.Vector3();
+const targetNormal = new THREE.Vector3();
+
+function raycastVoxelsFromObject(object) {
+  object.updateWorldMatrix(true, false);
+  voxelRayOrigin.setFromMatrixPosition(object.matrixWorld);
+  voxelRayDirection.set(0, 0, -1).transformDirection(object.matrixWorld);
+  voxelRaycaster.set(voxelRayOrigin, voxelRayDirection);
+  return voxelWorld.raycast(voxelRaycaster);
+}
+
+function rebuildVoxelGeometry(message) {
+  voxelWorld.rebuild(paletteOffset);
+  refreshGlyphCount();
+  updateStatus(message);
+}
+
+function editVoxelFromObject(object, place) {
+  const hit = raycastVoxelsFromObject(object);
+  if (!hit) {
+    updateStatus('no block targeted');
+    return;
+  }
+
+  if (!place) {
+    voxelWorld.remove(hit.voxel.x, hit.voxel.y, hit.voxel.z);
+    rebuildVoxelGeometry('block mined');
+    return;
+  }
+
+  const voxel = {
+    x: hit.voxel.x + hit.normal.x,
+    y: hit.voxel.y + hit.normal.y,
+    z: hit.voxel.z + hit.normal.z,
+  };
+  if (voxelWorld.has(voxel.x, voxel.y, voxel.z)) return;
+  if (voxelWorld.placementIntersectsPlayer(voxel, player.position)) {
+    updateStatus('cannot build inside player');
+    return;
+  }
+
+  const placed = voxelWorld.set(voxel.x, voxel.y, voxel.z, BLOCK_MATERIALS[selectedBlockIndex].id);
+  if (!placed) {
+    updateStatus('outside build limits');
+    return;
+  }
+  rebuildVoxelGeometry('block placed');
+}
+
+function updateBlockTarget() {
+  const source = renderer.xr.isPresenting
+    ? controllers.find((controller) => controller.visible && controller.userData.handedness === 'right')
+      ?? controllers.find((controller) => controller.visible)
+    : camera;
+  const hit = source ? raycastVoxelsFromObject(source) : null;
+  blockTarget.visible = Boolean(hit);
+  if (!hit) return;
+
+  targetNormal.set(hit.normal.x, hit.normal.y, hit.normal.z);
+  blockTarget.position.copy(hit.point).addScaledVector(targetNormal, 0.025);
+  blockTarget.quaternion.setFromUnitVectors(zAxis, targetNormal);
 }
 
 // Desktop controls.
@@ -287,12 +392,23 @@ addEventListener('keydown', (event) => {
     event.preventDefault();
     shiftPalette();
   }
+  if (/^Digit[1-6]$/.test(event.code) && !event.repeat) {
+    selectedBlockIndex = Number.parseInt(event.code.at(-1), 10) - 1;
+    updateStatus('material selected');
+  }
 });
 addEventListener('keyup', (event) => keys.delete(event.code));
 
 renderer.domElement.addEventListener('click', () => {
   if (!renderer.xr.isPresenting) renderer.domElement.requestPointerLock();
 });
+
+renderer.domElement.addEventListener('mousedown', (event) => {
+  if (renderer.xr.isPresenting || document.pointerLockElement !== renderer.domElement) return;
+  if (event.button === 0) editVoxelFromObject(camera, false);
+  if (event.button === 2) editVoxelFromObject(camera, true);
+});
+renderer.domElement.addEventListener('contextmenu', (event) => event.preventDefault());
 
 document.addEventListener('pointerlockchange', () => {
   document.body.classList.toggle('pointer-locked', document.pointerLockElement === renderer.domElement);
@@ -327,6 +443,14 @@ function applyBounds() {
   player.position.z = THREE.MathUtils.clamp(player.position.z, WORLD.minZ + 0.8, WORLD.maxZ - 0.8);
 }
 
+function movePlayerBy(dx, dz) {
+  const nextX = player.position.x + dx;
+  if (!voxelWorld.collidesPlayer(nextX, player.position.z)) player.position.x = nextX;
+  const nextZ = player.position.z + dz;
+  if (!voxelWorld.collidesPlayer(player.position.x, nextZ)) player.position.z = nextZ;
+  applyBounds();
+}
+
 function updateDesktopMovement(delta) {
   movement.set(0, 0, 0);
   if (keys.has('KeyW') || keys.has('ArrowUp')) movement.z -= 1;
@@ -335,9 +459,8 @@ function updateDesktopMovement(delta) {
   if (keys.has('KeyD') || keys.has('ArrowRight')) movement.x += 1;
   if (movement.lengthSq() === 0) return;
 
-  movement.normalize().applyQuaternion(player.quaternion);
-  player.position.addScaledVector(movement, delta * 4.2);
-  applyBounds();
+  movement.normalize().applyQuaternion(player.quaternion).multiplyScalar(delta * 4.2);
+  movePlayerBy(movement.x, movement.z);
 }
 
 function updateXRMovement(delta) {
@@ -359,8 +482,8 @@ function updateXRMovement(delta) {
     const y = axes[axes.length - 1];
 
     if (source.handedness === 'left' || session.inputSources.length === 1) {
-      if (Math.abs(x) > 0.14) player.position.addScaledVector(right, x * delta * 2.6);
-      if (Math.abs(y) > 0.14) player.position.addScaledVector(forward, -y * delta * 2.6);
+      if (Math.abs(x) > 0.14) movePlayerBy(right.x * x * delta * 2.6, right.z * x * delta * 2.6);
+      if (Math.abs(y) > 0.14) movePlayerBy(forward.x * -y * delta * 2.6, forward.z * -y * delta * 2.6);
     }
 
     if (source.handedness === 'right') {
@@ -416,6 +539,7 @@ function animate() {
   if (renderer.xr.isPresenting) updateXRMovement(delta);
   else updateDesktopMovement(delta);
 
+  updateBlockTarget();
   updateSigils(elapsed);
   portal.rotation.z += delta * (collectedSigils === sigils.length ? 0.55 : 0.12);
   const pulseAmount = collectedSigils === sigils.length ? 0.11 : 0.035;
