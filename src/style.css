@@ -1,0 +1,127 @@
+:root {
+  color: #b6ffe2;
+  background: #020604;
+  font-family: "Courier New", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-synthesis: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}
+
+.hud {
+  position: fixed;
+  z-index: 2;
+  top: 1.25rem;
+  left: 1.25rem;
+  width: min(31rem, calc(100vw - 2.5rem));
+  padding: 1rem 1.1rem;
+  border: 1px solid rgb(92 255 181 / 35%);
+  border-left: 3px solid #5cffb5;
+  background: rgb(1 10 7 / 72%);
+  box-shadow: 0 0 2rem rgb(41 255 162 / 8%);
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+.hud h1,
+.hud p {
+  margin: 0;
+}
+
+.hud h1 {
+  margin: 0.15rem 0 0.45rem;
+  color: #e9fff5;
+  font-size: clamp(1.3rem, 4vw, 2rem);
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 1rem #5cffb5;
+}
+
+.eyebrow {
+  color: #ff5cdc;
+  font-size: 0.7rem;
+  letter-spacing: 0.22em;
+}
+
+#status,
+.hint,
+.controls {
+  color: rgb(182 255 226 / 75%);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.9rem;
+  margin-top: 0.8rem;
+}
+
+kbd {
+  color: #fff;
+  font: inherit;
+}
+
+.hint {
+  margin-top: 0.55rem !important;
+  color: rgb(182 255 226 / 45%);
+}
+
+.reticle {
+  position: fixed;
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+  color: rgb(182 255 226 / 70%);
+  font: 18px/1 monospace;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.pointer-locked .hud {
+  opacity: 0.28;
+}
+
+.pointer-locked .reticle {
+  opacity: 1;
+}
+
+#VRButton {
+  border: 1px solid #5cffb5 !important;
+  border-radius: 0 !important;
+  color: #b6ffe2 !important;
+  background: rgb(1 10 7 / 88%) !important;
+  font-family: "Courier New", monospace !important;
+  letter-spacing: 0.12em !important;
+}
+
+@media (max-width: 600px) {
+  .hud {
+    top: 0.75rem;
+    left: 0.75rem;
+    width: calc(100vw - 1.5rem);
+  }
+
+  .controls {
+    display: none;
+  }
+}
