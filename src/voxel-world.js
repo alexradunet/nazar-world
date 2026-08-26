@@ -63,7 +63,7 @@ export class VoxelWorld {
     this.materialList = materials;
     this.faceResolution = faceResolution;
     this.blocks = new Map();
-    this.field = new GlyphField(atlas, parent);
+    this.field = new GlyphField(atlas, parent, { cellBackground: 0.42 });
 
     materials.forEach((material) => material.glyphs.forEach((glyph) => atlas.register(glyph)));
   }
@@ -117,7 +117,7 @@ export class VoxelWorld {
   rebuild(paletteOffset = 0) {
     this.field.clear();
     const resolution = this.faceResolution;
-    const cellSize = 0.92 / resolution;
+    const cellSize = 0.995 / resolution;
 
     for (const block of this.blocks.values()) {
       const material = this.materials.get(block.materialId);
@@ -170,7 +170,7 @@ export class VoxelWorld {
               color,
               position,
               face.rotation,
-              cellSize * 0.9,
+              cellSize * 1.015,
               {
                 voxel: { x: block.x, y: block.y, z: block.z },
                 normal: { x: face.normal.x, y: face.normal.y, z: face.normal.z },

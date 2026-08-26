@@ -98,8 +98,8 @@ const app = document.querySelector('#app');
 const status = document.querySelector('#status');
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x03050a);
-scene.fog = new THREE.FogExp2(0x03050a, 0.011);
+scene.background = new THREE.Color(0x050407);
+scene.fog = new THREE.FogExp2(0x050407, 0.009);
 
 const player = new THREE.Group();
 scene.add(player);

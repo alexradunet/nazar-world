@@ -157,12 +157,12 @@ export class GlyphAtlas {
     return this.texture;
   }
 
-  createMaterial() {
+  createMaterial({ cellBackground = 0 } = {}) {
     if (!this.texture) throw new Error('Build the glyph atlas before creating a glyph field');
 
     const material = new THREE.MeshBasicMaterial({
       map: this.texture,
-      alphaTest: 0.16,
+      alphaTest: cellBackground > 0 ? 0 : 0.16,
       side: THREE.DoubleSide,
       toneMapped: false,
       vertexColors: true,
@@ -190,16 +190,36 @@ uniform float glyphTileInset;`,
   vMapUv = (glyphCell + glyphUv) / glyphAtlasGrid;
 #endif`,
         );
+
+      if (cellBackground > 0) {
+        shader.uniforms.glyphCellBackground = { value: cellBackground };
+        shader.fragmentShader = shader.fragmentShader
+          .replace(
+            '#include <common>',
+            `#include <common>
+uniform float glyphCellBackground;`,
+          )
+          .replace(
+            '#include <map_fragment>',
+            `#ifdef USE_MAP
+  vec4 sampledDiffuseColor = texture2D(map, vMapUv);
+  float glyphCoverage = sampledDiffuseColor.a;
+  diffuseColor.rgb *= mix(glyphCellBackground, 1.0, glyphCoverage);
+  diffuseColor.a = 1.0;
+#endif`,
+          );
+      }
     };
-    material.customProgramCacheKey = () => 'nazar-glyph-atlas-v1';
+    material.customProgramCacheKey = () => `nazar-glyph-atlas-v2-${cellBackground > 0 ? 'cells' : 'glyphs'}`;
     return material;
   }
 }
 
 export class GlyphField {
-  constructor(atlas, parent) {
+  constructor(atlas, parent, materialOptions = {}) {
     this.atlas = atlas;
     this.parent = parent;
+    this.materialOptions = materialOptions;
     this.instances = [];
     this.mesh = null;
     this.baseColors = [];
@@ -241,7 +261,7 @@ export class GlyphField {
 
     const mesh = new THREE.InstancedMesh(
       geometry,
-      this.atlas.createMaterial(),
+      this.atlas.createMaterial(this.materialOptions),
       this.instances.length,
     );
 
