@@ -12,12 +12,12 @@ import {
 import './style.css';
 
 const COLORS = {
-  mint: 0x5cffb5,
-  cyan: 0x55dfff,
-  magenta: 0xff5cdc,
-  violet: 0x9b7bff,
-  dim: 0x287a58,
-  white: 0xe9fff5,
+  mint: 0x7dffca,
+  cyan: 0x75eaff,
+  magenta: 0xff78e6,
+  violet: 0xba9cff,
+  dim: 0x45bd86,
+  white: 0xffffff,
 };
 
 const WORLD = {
@@ -31,8 +31,8 @@ const app = document.querySelector('#app');
 const status = document.querySelector('#status');
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x020604);
-scene.fog = new THREE.FogExp2(0x020604, 0.032);
+scene.background = new THREE.Color(0x03050a);
+scene.fog = new THREE.FogExp2(0x03050a, 0.011);
 
 const player = new THREE.Group();
 scene.add(player);
@@ -77,8 +77,16 @@ glyphFields.push(world);
 for (let x = WORLD.minX; x <= WORLD.maxX; x += 1) {
   for (let z = WORLD.minZ; z <= WORLD.maxZ; z += 1) {
     const noise = hash2(x, z);
-    const glyph = choose(noise, OCTANT_GLYPHS);
-    const color = noise > 0.9 ? COLORS.cyan : noise > 0.72 ? COLORS.mint : COLORS.dim;
+    const glyph = noise < 0.46
+      ? choose(noise / 0.46, ['.', '.', ':', '+', '·'])
+      : choose((noise - 0.46) / 0.54, OCTANT_GLYPHS);
+    const color = noise > 0.86
+      ? COLORS.cyan
+      : noise > 0.66
+        ? COLORS.mint
+        : noise > 0.48
+          ? COLORS.violet
+          : COLORS.dim;
     world.add(glyph, color, new THREE.Vector3(x, 0.012, z), floorRotation, 0.72);
   }
 }
@@ -88,8 +96,10 @@ function addBoundaryWallZ(z, rotationY) {
   for (let x = WORLD.minX; x <= WORLD.maxX; x += 0.9) {
     for (let y = 0.45; y <= 4.5; y += 0.9) {
       const noise = hash2(Math.round(x * 10), Math.round((z + y) * 10));
-      const glyph = choose(noise, SEXTANT_GLYPHS);
-      const color = noise > 0.82 ? COLORS.cyan : COLORS.mint;
+      const glyph = noise < 0.38
+        ? choose(noise / 0.38, ['#', '%', 'H'])
+        : choose((noise - 0.38) / 0.62, SEXTANT_GLYPHS);
+      const color = noise > 0.78 ? COLORS.cyan : COLORS.mint;
       world.add(glyph, color, new THREE.Vector3(x, y, z), rotation, 0.7);
     }
   }
@@ -99,8 +109,10 @@ function addBoundaryWallX(x) {
   for (let z = WORLD.minZ; z <= WORLD.maxZ; z += 0.9) {
     for (let y = 0.45; y <= 4.5; y += 0.9) {
       const noise = hash2(Math.round((x + y) * 10), Math.round(z * 10));
-      const glyph = choose(noise, SEXTANT_GLYPHS);
-      const color = noise > 0.86 ? COLORS.violet : COLORS.mint;
+      const glyph = noise < 0.38
+        ? choose(noise / 0.38, ['#', '=', 'N'])
+        : choose((noise - 0.38) / 0.62, SEXTANT_GLYPHS);
+      const color = noise > 0.8 ? COLORS.violet : COLORS.mint;
       world.add(glyph, color, new THREE.Vector3(x, y, z), xWallRotation, 0.7);
     }
   }
@@ -161,6 +173,12 @@ function addText(text, centerX, y, z, color, size = 0.5) {
 }
 
 addText('THE NULL IS LISTENING', 0, 4.2, WORLD.minZ + 0.03, COLORS.white, 0.52);
+addText('FIND 5 SIGILS', 0, 2.35, 1.5, COLORS.white, 0.42);
+
+// A bright punctuation trail makes the first objective readable from spawn.
+for (let z = 7; z >= 3; z -= 0.65) {
+  world.add('^', COLORS.cyan, new THREE.Vector3(0, 0.025, z), floorRotation, 0.38);
+}
 
 // Sparse overhead stars give the room depth without conventional geometry.
 for (let index = 0; index < 180; index += 1) {
@@ -190,11 +208,11 @@ for (let index = 0; index < portalGlyphs; index += 1) {
 // entirely character-based while position, collection, and behavior remain data.
 const sigils = [];
 const sigilPositions = [
+  [0, 3.2],
   [-9, -13],
   [8, -11],
   [-10, 0],
-  [10, 7],
-  [0, -5],
+  [9, 5],
 ];
 const sigilSymbols = ['*', '$', '?', '!', '@'];
 const sigilColors = [COLORS.cyan, COLORS.magenta, COLORS.violet, COLORS.mint, COLORS.white];
