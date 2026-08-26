@@ -27,6 +27,10 @@ WebXR requires a secure context. `localhost` is accepted for local development; 
 
 The world renders glyphs as `THREE.InstancedMesh` batches grouped by character and color, avoiding one object/draw call per glyph.
 
+## Sextant and octant mosaics
+
+Terrain uses 2×4 octant mosaics while boundary walls use 2×3 sextants. These are drawn procedurally into the glyph atlas rather than relying on installed Unicode fonts, because many current headset fonts do not yet include the octant range. The resulting textures retain the same block-cell geometry and remain GPU-instanced.
+
 ## Deployment
 
 Pushes to `main` automatically build and deploy the site through `.github/workflows/deploy-pages.yml`. Vite's base path is configured for `/nazar-world/` in `vite.config.js`.

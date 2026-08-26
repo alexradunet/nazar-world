@@ -47,6 +47,49 @@ const allGlyphMeshes = [];
 let glyphCount = 0;
 let paletteOffset = 0;
 
+// Unicode sextants use a 2×3 cell and octants a 2×4 cell. We draw the
+// same mosaics ourselves so newer octants work even when a headset font
+// does not yet cover Symbols for Legacy Computing Supplement.
+function mosaicGlyph(kind, mask) {
+  return `${kind}:${mask.toString(16)}`;
+}
+
+const SEXTANT_GLYPHS = [
+  0b010101,
+  0b101010,
+  0b100101,
+  0b011010,
+  0b110011,
+  0b101101,
+  0b011110,
+  0b111001,
+].map((mask) => mosaicGlyph('sextant', mask));
+
+const OCTANT_GLYPHS = [
+  0b01010101,
+  0b10101010,
+  0b10011001,
+  0b01100110,
+  0b11110000,
+  0b00111100,
+  0b11011011,
+  0b11100111,
+].map((mask) => mosaicGlyph('octant', mask));
+
+function drawMosaic(context, rows, mask) {
+  const left = 18;
+  const top = 10;
+  const cellWidth = 46;
+  const cellHeight = 108 / rows;
+
+  for (let cell = 0; cell < rows * 2; cell += 1) {
+    if ((mask & (1 << cell)) === 0) continue;
+    const column = cell % 2;
+    const row = Math.floor(cell / 2);
+    context.fillRect(left + column * cellWidth, top + row * cellHeight, cellWidth + 0.5, cellHeight + 0.5);
+  }
+}
+
 function glyphTexture(glyph) {
   if (textureCache.has(glyph)) return textureCache.get(glyph);
 
@@ -56,10 +99,16 @@ function glyphTexture(glyph) {
   const context = canvas.getContext('2d');
   context.clearRect(0, 0, 128, 128);
   context.fillStyle = '#ffffff';
-  context.font = '700 92px "Courier New", monospace';
-  context.textAlign = 'center';
-  context.textBaseline = 'middle';
-  context.fillText(glyph, 64, 68);
+
+  const mosaic = /^(sextant|octant):([0-9a-f]+)$/.exec(glyph);
+  if (mosaic) {
+    drawMosaic(context, mosaic[1] === 'sextant' ? 3 : 4, Number.parseInt(mosaic[2], 16));
+  } else {
+    context.font = '700 92px "Courier New", monospace';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(glyph, 64, 68);
+  }
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -135,7 +184,7 @@ const world = new GlyphField();
 for (let x = WORLD.minX; x <= WORLD.maxX; x += 1) {
   for (let z = WORLD.minZ; z <= WORLD.maxZ; z += 1) {
     const noise = hash2(x, z);
-    const glyph = choose(noise, ['.', '.', '.', ':', '+', '·']);
+    const glyph = choose(noise, OCTANT_GLYPHS);
     const color = noise > 0.9 ? COLORS.cyan : noise > 0.72 ? COLORS.mint : COLORS.dim;
     world.add(glyph, color, new THREE.Vector3(x, 0.012, z), floorRotation, 0.72);
   }
@@ -146,7 +195,7 @@ function addBoundaryWallZ(z, rotationY) {
   for (let x = WORLD.minX; x <= WORLD.maxX; x += 0.9) {
     for (let y = 0.45; y <= 4.5; y += 0.9) {
       const noise = hash2(Math.round(x * 10), Math.round((z + y) * 10));
-      const glyph = choose(noise, ['#', '#', '%', 'H']);
+      const glyph = choose(noise, SEXTANT_GLYPHS);
       const color = noise > 0.82 ? COLORS.cyan : COLORS.mint;
       world.add(glyph, color, new THREE.Vector3(x, y, z), rotation, 0.7);
     }
@@ -157,7 +206,7 @@ function addBoundaryWallX(x) {
   for (let z = WORLD.minZ; z <= WORLD.maxZ; z += 0.9) {
     for (let y = 0.45; y <= 4.5; y += 0.9) {
       const noise = hash2(Math.round((x + y) * 10), Math.round(z * 10));
-      const glyph = choose(noise, ['#', '#', '=', 'N']);
+      const glyph = choose(noise, SEXTANT_GLYPHS);
       const color = noise > 0.86 ? COLORS.violet : COLORS.mint;
       world.add(glyph, color, new THREE.Vector3(x, y, z), xWallRotation, 0.7);
     }
@@ -246,7 +295,7 @@ for (let index = 0; index < portalGlyphs; index += 1) {
 }
 portalField.flush();
 
-status.textContent = `${glyphCount.toLocaleString()} glyphs online // WebXR ready`;
+status.textContent = `${glyphCount.toLocaleString()} glyphs // sextants + octants online`;
 
 function shiftPalette() {
   paletteOffset = (paletteOffset + 0.11) % 1;
