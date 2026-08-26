@@ -31,7 +31,7 @@ function patternIndex(x, y, z, face, cell, length) {
 }
 
 export class VoxelWorld {
-  constructor(atlas, parent, materials, { faceResolution = 2 } = {}) {
+  constructor(atlas, parent, materials, { faceResolution = 8 } = {}) {
     this.atlas = atlas;
     this.parent = parent;
     this.materials = new Map(materials.map((material) => [material.id, material]));
@@ -70,23 +70,23 @@ export class VoxelWorld {
 
     // A glyph-block gateway directly in front of the starting area.
     for (let y = 0; y <= 3; y += 1) {
-      this.set(-3, y, 0, y === 3 ? 'metal' : 'stone');
-      this.set(3, y, 0, y === 3 ? 'metal' : 'stone');
+      this.set(-3, y, 0, y === 3 ? 'wood' : 'stone');
+      this.set(3, y, 0, y === 3 ? 'wood' : 'stone');
     }
-    for (let x = -2; x <= 2; x += 1) this.set(x, 3, 0, 'metal');
+    for (let x = -2; x <= 2; x += 1) this.set(x, 3, 0, 'wood');
 
     // A stepped ruin, a bright tower, and a floating glass target.
     for (let step = 0; step < 4; step += 1) {
-      for (let y = 0; y <= step; y += 1) this.set(-7 + step, y, -5, 'soil');
+      for (let y = 0; y <= step; y += 1) this.set(-7 + step, y, -5, 'grass');
     }
-    for (let y = 0; y <= 4; y += 1) this.set(6, y, -6, y % 2 ? 'signal' : 'stone');
+    for (let y = 0; y <= 4; y += 1) this.set(6, y, -6, y % 2 ? 'glow' : 'stone');
     this.set(0, 1, -1, 'glass');
 
     // Small material samples close to spawn for mining and placement tests.
     this.set(2, 0, 5, 'stone');
-    this.set(2, 1, 5, 'organic');
-    this.set(-2, 0, 4, 'soil');
-    this.set(-2, 1, 4, 'signal');
+    this.set(2, 1, 5, 'leaves');
+    this.set(-2, 0, 4, 'grass');
+    this.set(-2, 1, 4, 'glow');
   }
 
   rebuild(paletteOffset = 0) {
@@ -109,8 +109,21 @@ export class VoxelWorld {
         for (let row = 0; row < resolution; row += 1) {
           for (let column = 0; column < resolution; column += 1) {
             const cell = row * resolution + column;
-            const glyph = material.glyphs[
-              patternIndex(block.x, block.y, block.z, faceIndex, cell, material.glyphs.length)
+            const style = material.sample?.({
+              block,
+              normal: face.normal,
+              faceIndex,
+              row,
+              column,
+              resolution,
+            }) ?? material;
+            const glyphs = style.glyphs ?? material.glyphs;
+            const colors = style.colors ?? material.colors ?? [style.color ?? material.color];
+            const glyph = glyphs[
+              patternIndex(block.x, block.y, block.z, faceIndex, cell, glyphs.length)
+            ];
+            const color = colors[
+              patternIndex(block.x, block.y, block.z, faceIndex + 11, cell + 97, colors.length)
             ];
             const horizontal = (column - (resolution - 1) / 2) * cellSize;
             const vertical = ((resolution - 1) / 2 - row) * cellSize;
@@ -121,7 +134,7 @@ export class VoxelWorld {
 
             this.field.add(
               glyph,
-              material.color,
+              color,
               position,
               face.rotation,
               cellSize * 0.9,

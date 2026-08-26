@@ -43,7 +43,7 @@ A glyph entity owns a transform, behavior, optional collider, and one or more gl
 4. Render each `GlyphField` with one `THREE.InstancedMesh` draw call.
 5. Let a small shader modification select the correct atlas tile per instance.
 
-This scales much better than creating one material or mesh per character. Static terrain can occupy one field, while independently animated actors use their own fields.
+This scales much better than creating one material or mesh per character. Static terrain can occupy one field, while independently animated actors use their own fields. Voxel faces currently use an 8×8 grid (64 glyph instances per exposed face); internal faces are culled, and future distance LOD can reduce far blocks to 4×4, 2×2, or one mosaic glyph.
 
 ## World compilation
 
@@ -87,7 +87,7 @@ The prototype already uses:
 - quadrant ruin surfaces;
 - procedural Braille star and particle fields;
 - ASCII architecture and portal pieces;
-- editable glyph voxels with 2×2 character-textured exposed faces;
+- editable glyph voxels with colorful 8×8 character-textured exposed faces;
 - voxel-DDA block targeting, mining, placement, and simple collision;
 - text-authored collectible sigils;
 - glyph-composed VR controllers and rays;

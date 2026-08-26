@@ -19,15 +19,66 @@ const COLORS = {
   violet: 0xba9cff,
   dim: 0x45bd86,
   white: 0xffffff,
+  grass: 0x4ee85f,
+  lime: 0xb6ff63,
+  earth: 0xc87848,
+  amber: 0xffb347,
+  yellow: 0xffef72,
+  blue: 0x4f8fff,
+  slate: 0x91a0b8,
 };
 
 const BLOCK_MATERIALS = [
-  { id: 'stone', label: 'STONE', color: COLORS.white, glyphs: ['#', '%', QUADRANT_GLYPHS[4]] },
-  { id: 'soil', label: 'SOIL', color: COLORS.dim, glyphs: ['.', ':', OCTANT_GLYPHS[2]] },
-  { id: 'metal', label: 'METAL', color: COLORS.cyan, glyphs: ['H', '=', '+'] },
-  { id: 'glass', label: 'GLASS', color: COLORS.violet, glyphs: ['/', '\\', '|'] },
-  { id: 'organic', label: 'ORGANIC', color: COLORS.mint, glyphs: ['&', '@', '*'] },
-  { id: 'signal', label: 'SIGNAL', color: COLORS.magenta, glyphs: ['0', '1', BRAILLE_GLYPHS[4]] },
+  {
+    id: 'grass',
+    label: 'GRASS',
+    color: COLORS.grass,
+    colors: [COLORS.grass, COLORS.lime, COLORS.mint],
+    glyphs: ["'", '"', '.', ':', '%', '*', OCTANT_GLYPHS[2]],
+    sample: ({ normal, row, resolution }) => {
+      if (normal.y > 0) return { glyphs: ["'", '"', '.', '*'], colors: [COLORS.grass, COLORS.lime, COLORS.mint] };
+      if (normal.y < 0 || row >= Math.ceil(resolution * 0.25)) return { glyphs: ['.', ':', '%'], colors: [COLORS.earth, COLORS.amber, COLORS.dim] };
+      return { glyphs: ["'", '"', ':'], colors: [COLORS.grass, COLORS.lime] };
+    },
+  },
+  {
+    id: 'stone',
+    label: 'STONE',
+    color: COLORS.slate,
+    colors: [COLORS.slate, COLORS.white, COLORS.violet],
+    glyphs: ['#', '%', '.', QUADRANT_GLYPHS[4]],
+  },
+  {
+    id: 'wood',
+    label: 'WOOD',
+    color: COLORS.amber,
+    colors: [COLORS.amber, COLORS.earth, COLORS.yellow],
+    glyphs: ['|', '!', 'H', '=', 'O', '0', '@'],
+    sample: ({ normal }) => normal.y === 0
+      ? { glyphs: ['|', '!', 'H'], colors: [COLORS.amber, COLORS.earth, COLORS.yellow] }
+      : { glyphs: ['O', '0', '@'], colors: [COLORS.yellow, COLORS.amber, COLORS.earth] },
+  },
+  {
+    id: 'leaves',
+    label: 'LEAVES',
+    color: COLORS.lime,
+    colors: [COLORS.grass, COLORS.lime, COLORS.mint, COLORS.yellow],
+    glyphs: ['&', '*', '+', SEXTANT_GLYPHS[5], BRAILLE_GLYPHS[4]],
+  },
+  {
+    id: 'glass',
+    label: 'GLASS',
+    color: COLORS.cyan,
+    colors: [COLORS.cyan, COLORS.blue, COLORS.violet, COLORS.white],
+    glyphs: ['/', '\\', '|', '.', BRAILLE_GLYPHS[1]],
+  },
+  {
+    id: 'glow',
+    label: 'GLOW',
+    color: COLORS.magenta,
+    colors: [COLORS.magenta, COLORS.yellow, COLORS.cyan, COLORS.white],
+    glyphs: ['0', '1', '*', '+', BRAILLE_GLYPHS[4]],
+  },
 ];
 
 const WORLD = {
@@ -201,8 +252,8 @@ for (let index = 0; index < 180; index += 1) {
 }
 
 // Minecraft-like blocks are stored as voxels, but every exposed face is
-// compiled into a 2×2 character texture through the same glyph renderer.
-const voxelWorld = new VoxelWorld(glyphAtlas, scene, BLOCK_MATERIALS);
+// compiled into an 8×8 character texture through the same glyph renderer.
+const voxelWorld = new VoxelWorld(glyphAtlas, scene, BLOCK_MATERIALS, { faceResolution: 8 });
 voxelWorld.generateDemo();
 glyphFields.push(voxelWorld.field);
 

@@ -33,9 +33,9 @@ See [`docs/GLYPH_ENGINE.md`](docs/GLYPH_ENGINE.md) for the character vocabulary,
 
 ## Glyph voxels
 
-Minecraft-like blocks are stored in a sparse 3D grid. Only exposed faces are rendered, and every face is a 2×2 character texture compiled into the shared instanced glyph field. Hidden voxel data handles targeting and collision without introducing visible conventional cube meshes.
+Minecraft-like blocks are stored in a sparse 3D grid. Only exposed faces are rendered, and every face is an 8×8 texture made from 64 independently colored glyph cells compiled into the shared instanced field. Hidden voxel data handles targeting and collision without introducing visible conventional cube meshes.
 
-Six materials combine ASCII and mosaic glyphs: stone, soil, metal, glass, organic, and signal.
+Six bright, face-aware materials combine ASCII and mosaic glyphs: grass, stone, wood, leaves, glass, and glow. Grass blocks use different top, side-edge, side-earth, and bottom styles; logs use separate bark and ring styles.
 
 ## Procedural mosaic vocabulary
 
